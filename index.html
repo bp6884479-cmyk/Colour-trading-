@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Color Guessing Game</title>
+
+<style>
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 15px;
+  background: rgb(41, 112, 145);
+  text-align: center;
+  font-family: monospace;
+  color: white;
+}
+
+#firstPart {
+  background: rgb(49, 166, 220);
+  padding: 15px 10px 25px;
+  border: 1px solid gray;
+  border-radius: 12px;
+}
+
+#title {
+  font-size: clamp(25px, 6vw, 42px);
+  margin: 5px 0 15px;
+  color: white;
+  text-shadow: 3px 2px rgb(3, 180, 160);
+  font-weight: bold;
+}
+
+#text {
+  font-size: clamp(20px, 5vw, 35px);
+  color: rgb(233, 248, 245);
+  overflow-wrap: anywhere;
+  margin: 15px 0 5px;
+}
+
+#secondPart {
+  max-width: 650px;
+  margin: 20px auto;
+}
+
+#score {
+  text-align: left;
+  margin-bottom: 15px;
+}
+
+#scoreTable {
+  font-size: 22px;
+  margin: 0;
+  text-shadow: 1px 1px rgb(3, 239, 193);
+}
+
+#statement {
+  font-size: 22px;
+  margin: 10px 0 20px;
+  color: white;
+  text-shadow: 1px 1px rgb(3, 239, 193);
+}
+
+#gameBoard {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  max-width: 540px;
+  margin: 0 auto;
+}
+
+.canvas {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  height: auto;
+  border: 4px solid white;
+  border-radius: 13px;
+  transition: transform 0.2s, box-shadow 0.2s;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.canvas:hover {
+  transform: scale(1.03);
+  box-shadow: 0 0 18px rgb(3, 239, 193);
+}
+
+.canvas:focus-visible {
+  outline: 3px solid yellow;
+  outline-offset: 3px;
+}
+
+#message {
+  min-height: 28px;
+  font-size: 17px;
+  margin: 15px 0;
+}
+
+#restart {
+  border: none;
+  border-radius: 10px;
+  padding: 12px 24px;
+  background: rgb(3, 239, 193);
+  color: #123;
+  font-weight: bold;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+#restart:hover {
+  filter: brightness(1.1);
+}
+
+@media (max-width: 360px) {
+  body {
+    padding: 8px;
+  }
+
+  #gameBoard {
+    gap: 7px;
+  }
+
+  .canvas {
+    border-width: 3px;
+    border-radius: 9px;
+  }
+}
+</style>
+</head>
+
+<body>
+
+<div id="firstPart">
+  <p id="title">COLOR GUESSING GAME</p>
+  <p>Find this color:</p>
+  <p id="text">Loading...</p>
+</div>
+
+<div id="secondPart">
+
+  <div id="score">
+    <p id="scoreTable">Score: 0</p>
+  </div>
+
+  <p id="statement">Pick the right color!</p>
+
+  <div id="gameBoard">
+    <canvas id="canvas1" class="canvas" tabindex="0"
+      role="button" aria-label="Color option 1"></canvas>
+    <canvas id="canvas2" class="canvas" tabindex="0"
+      role="button" aria-label="Color option 2"></canvas>
+    <canvas id="canvas3" class="canvas" tabindex="0"
+      role="button" aria-label="Color option 3"></canvas>
+    <canvas id="canvas4" class="canvas" tabindex="0"
+      role="button" aria-label="Color option 4"></canvas>
+    <canvas id="canvas5" class="canvas" tabindex="0"
+      role="button" aria-label="Color option 5"></canvas>
+    <canvas id="canvas6" class="canvas" tabindex="0"
+      role="button" aria-label="Color option 6"></canvas>
+  </div>
+
+  <p id="message" aria-live="polite"></p>
+
+  <button id="restart" type="button">Restart Game</button>
+
+</div>
+
+<script>
+"use strict";
+
+const canvases = [
+  document.getElementById("canvas1"),
+  document.getElementById("canvas2"),
+  document.getElementById("canvas3"),
+  document.getElementById("canvas4"),
+  document.getElementById("canvas5"),
+  document.getElementById("canvas6")
+];
+
+const targetText = document.getElementById("text");
+const scoreTable = document.getElementById("scoreTable");
+const statement = document.getElementById("statement");
+const message = document.getElementById("message");
+const restartButton = document.getElementById("restart");
+
+let score = 0;
+let targetRGB = "";
+let roundActive = false;
+let roundNumber = 0;
+const pointsPerRound = 10;
+
+function randomColor() {
+  const red = Math.floor(Math.random() * 256);
+  const green = Math.floor(Math.random() * 256);
+  const blue = Math.floor(Math.random() * 256);
+
+  return {
+    red,
+    green,
+    blue,
+    css: `rgb(${red}, ${green}, ${blue})`
+  };
+}
+
+function paintCanvas(canvas, color) {
+  const context = canvas.getContext("2d");
+
+  // High-quality canvas rendering on high-density screens.
+  const size = 160;
+  const ratio = window.devicePixelRatio || 1;
+
+  canvas.width = Math.round(size * ratio);
+  canvas.height = Math.round(size * ratio);
+
+  context.setTransform(ratio, 0, 0, ratio, 0, 0);
+  context.fillStyle = color;
+  context.fillRect(0, 0, size, size);
+
+  canvas.dataset.color = color;
+  canvas.style.borderColor = "white";
+  canvas.style.opacity = "1";
+  canvas.style.pointerEvents = "auto";
+}
+
+function startRound() {
+  roundNumber++;
+  roundActive = true;
+
+  const targetIndex = Math.floor(Math.random() * canvases.length);
+  const targetColor = randomColor();
+
+  targetRGB = targetColor.css;
+  targetText.textContent = targetRGB;
+
+  canvases.forEach((canvas, index) => {
+    let color;
+
+    if (index === targetIndex) {
+      color = targetRGB;
+    } else {
+      // Ensure that the wrong options do not match the answer.
+      do {
+        color = randomColor().css;
+      } while (color === targetRGB);
+    }
+
+    paintCanvas(canvas, color);
+  });
+
+  statement.textContent = "Pick the right color!";
+  message.textContent = "";
+  scoreTable.textContent = `Score: ${score}`;
+}
+
+function checkAnswer(canvas) {
+  if (!roundActive) return;
+
+  roundActive = false;
+
+  if (canvas.dataset.color === targetRGB) {
+    score += pointsPerRound;
+
+    canvas.style.borderColor = "#00ff80";
+    statement.textContent = "Correct! 🎉";
+    message.textContent = `+${pointsPerRound} points!`;
+
+    scoreTable.textContent = `Score: ${score}`;
+
+    setTimeout(() => {
+      startRound();
+    }, 1000);
+
+  } else {
+    canvas.style.borderColor = "#ff3333";
+    statement.textContent = "Wrong answer!";
+    message.textContent = "Try again in the next round.";
+
+    // Reveal the correct option.
+    canvases.forEach(option => {
+      if (option.dataset.color === targetRGB) {
+        option.style.borderColor = "#00ff80";
+      }
+    });
+
+    setTimeout(() => {
+      startRound();
+    }, 1200);
+  }
+}
+
+canvases.forEach(canvas => {
+  canvas.addEventListener("click", () => {
+    checkAnswer(canvas);
+  });
+
+  canvas.addEventListener("keydown", event => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      checkAnswer(canvas);
+    }
+  });
+});
+
+restartButton.addEventListener("click", () => {
+  score = 0;
+  roundNumber = 0;
+  startRound();
+});
+
+// Start only after the page elements are ready.
+startRound();
+</script>
+
+</body>
+</html>
